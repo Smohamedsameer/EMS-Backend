@@ -1,0 +1,11 @@
+target/
+*.class
+.settings/
+.classpath
+.project
+.mvn/
+*.iml
+.idea/
+
+# Do not commit real local credentials
+application.properties
