@@ -2,6 +2,7 @@ package com.ems.service;
 
 import com.ems.dto.AttendanceCorrectionRequest;
 import com.ems.dto.AttendanceResponse;
+import com.ems.dto.LocationRequest;
 import com.ems.entity.Attendance;
 import com.ems.entity.AttendanceStatus;
 import com.ems.entity.Employee;
@@ -32,7 +33,7 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
 
     @Transactional
-    public AttendanceResponse checkIn(Employee employee) {
+    public AttendanceResponse checkIn(Employee employee, LocationRequest location) {
         LocalDate today = LocalDate.now();
         Optional<Attendance> existing = attendanceRepository.findByEmployeeIdAndAttendanceDate(employee.getId(), today);
 
@@ -49,13 +50,17 @@ public class AttendanceService {
                 .build());
         attendance.setCheckIn(now);
         attendance.setStatus(status);
+        if (location != null) {
+            attendance.setCheckInLatitude(location.getLatitude());
+            attendance.setCheckInLongitude(location.getLongitude());
+        }
 
         attendance = attendanceRepository.save(attendance);
         return toResponse(attendance);
     }
 
     @Transactional
-    public AttendanceResponse checkOut(Employee employee) {
+    public AttendanceResponse checkOut(Employee employee, LocationRequest location) {
         LocalDate today = LocalDate.now();
         Attendance attendance = attendanceRepository.findByEmployeeIdAndAttendanceDate(employee.getId(), today)
                 .orElseThrow(() -> new BadRequestException("You must check in before checking out"));
@@ -73,6 +78,10 @@ public class AttendanceService {
         }
 
         attendance.setCheckOut(now);
+        if (location != null) {
+            attendance.setCheckOutLatitude(location.getLatitude());
+            attendance.setCheckOutLongitude(location.getLongitude());
+        }
         double hours = Duration.between(attendance.getCheckIn(), now).toMinutes() / 60.0;
         hours = Math.round(hours * 100.0) / 100.0;
         attendance.setWorkingHours(hours);
@@ -85,43 +94,22 @@ public class AttendanceService {
         return toResponse(attendance);
     }
 
-    @Transactional(readOnly = true)
     public AttendanceResponse getTodayAttendance(Employee employee) {
-        return attendanceRepository
-                .findByEmployeeIdAndAttendanceDate(employee.getId(), LocalDate.now())
+        return attendanceRepository.findByEmployeeIdAndAttendanceDate(employee.getId(), LocalDate.now())
                 .map(this::toResponse)
                 .orElse(null);
     }
 
-    @Transactional(readOnly = true)
     public List<AttendanceResponse> getHistory(Long employeeId) {
-        return attendanceRepository
-                .findByEmployeeIdOrderByAttendanceDateDesc(employeeId)
-                .stream()
+        return attendanceRepository.findByEmployeeIdOrderByAttendanceDateDesc(employeeId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<AttendanceResponse> search(
-            Long employeeId,
-            LocalDate date,
-            String department,
-            String status) {
-
-        AttendanceStatus statusEnum =
-                (status == null || status.isBlank())
-                        ? null
-                        : AttendanceStatus.valueOf(status.toUpperCase());
-
-        String dept =
-                (department == null || department.isBlank())
-                        ? null
-                        : department;
-
-        return attendanceRepository
-                .search(employeeId, date, dept, statusEnum)
-                .stream()
+    public List<AttendanceResponse> search(Long employeeId, LocalDate date, String department, String status) {
+        AttendanceStatus statusEnum = (status == null || status.isBlank()) ? null : AttendanceStatus.valueOf(status.toUpperCase());
+        String dept = (department == null || department.isBlank()) ? null : department;
+        return attendanceRepository.search(employeeId, date, dept, statusEnum).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -186,7 +174,11 @@ public class AttendanceService {
                 .department(a.getEmployee().getDepartment())
                 .attendanceDate(a.getAttendanceDate())
                 .checkIn(a.getCheckIn())
+                .checkInLatitude(a.getCheckInLatitude())
+                .checkInLongitude(a.getCheckInLongitude())
                 .checkOut(a.getCheckOut())
+                .checkOutLatitude(a.getCheckOutLatitude())
+                .checkOutLongitude(a.getCheckOutLongitude())
                 .workingHours(a.getWorkingHours())
                 .status(a.getStatus().name())
                 .build();

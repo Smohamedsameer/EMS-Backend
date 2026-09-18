@@ -2,6 +2,7 @@ package com.ems.controller;
 
 import com.ems.dto.AttendanceCorrectionRequest;
 import com.ems.dto.AttendanceResponse;
+import com.ems.dto.LocationRequest;
 import com.ems.entity.Employee;
 import com.ems.security.CurrentUser;
 import com.ems.service.AttendanceService;
@@ -23,15 +24,15 @@ public class AttendanceController {
     private final EmployeeService employeeService;
 
     @PostMapping("/check-in")
-    public ResponseEntity<AttendanceResponse> checkIn() {
+    public ResponseEntity<AttendanceResponse> checkIn(@RequestBody(required = false) LocationRequest location) {
         Employee employee = employeeService.getEmployeeByUserId(CurrentUser.userId());
-        return ResponseEntity.ok(attendanceService.checkIn(employee));
+        return ResponseEntity.ok(attendanceService.checkIn(employee, location));
     }
 
     @PostMapping("/check-out")
-    public ResponseEntity<AttendanceResponse> checkOut() {
+    public ResponseEntity<AttendanceResponse> checkOut(@RequestBody(required = false) LocationRequest location) {
         Employee employee = employeeService.getEmployeeByUserId(CurrentUser.userId());
-        return ResponseEntity.ok(attendanceService.checkOut(employee));
+        return ResponseEntity.ok(attendanceService.checkOut(employee, location));
     }
 
     @GetMapping("/today")
