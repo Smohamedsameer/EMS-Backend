@@ -19,8 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AttendanceController {
 
-	private final EmployeeService employeeService;
     private final AttendanceService attendanceService;
+    private final EmployeeService employeeService;
 
     @PostMapping("/check-in")
     public ResponseEntity<AttendanceResponse> checkIn() {
