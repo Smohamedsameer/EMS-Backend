@@ -19,11 +19,9 @@ public class AttendanceResponse {
     private String department;
     private LocalDate attendanceDate;
     private LocalDateTime checkIn;
-    private Double checkInLatitude;
-    private Double checkInLongitude;
+    private Double latitude;
+    private Double longitude;
     private LocalDateTime checkOut;
-    private Double checkOutLatitude;
-    private Double checkOutLongitude;
     private Double workingHours;
     private String status;
 }

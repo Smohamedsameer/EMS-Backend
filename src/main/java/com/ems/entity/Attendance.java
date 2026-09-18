@@ -41,15 +41,11 @@ public class Attendance {
 
     @Column(name = "check_in_longitude")
     private Double checkInLongitude;
-
+    
     @Column(name = "check_out")
     private LocalDateTime checkOut;
-
-    @Column(name = "check_out_latitude")
-    private Double checkOutLatitude;
-
-    @Column(name = "check_out_longitude")
-    private Double checkOutLongitude;
+    
+    
 
     @Column(name = "working_hours")
     private Double workingHours;
