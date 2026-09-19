@@ -24,7 +24,7 @@ public class LeaveService {
     private final NotificationService notificationService;
     private final AttendanceService attendanceService;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public LeaveResponse applyLeave(Employee employee, LeaveRequestDto request) {
         if (request.getToDate().isBefore(request.getFromDate())) {
             throw new BadRequestException("To date cannot be before from date");
@@ -63,7 +63,7 @@ public class LeaveService {
                 .map(this::toResponse)
                 .toList();
     }
-    @Transactional
+    @Transactional(readOnly = true)
     public LeaveResponse approveLeave(Long id, String adminComment) {
         LeaveRequest leave = getEntity(id);
         leave.setStatus(LeaveStatus.APPROVED);
@@ -84,7 +84,7 @@ public class LeaveService {
         return toResponse(leave);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public LeaveResponse rejectLeave(Long id, String adminComment) {
         LeaveRequest leave = getEntity(id);
         leave.setStatus(LeaveStatus.REJECTED);

@@ -28,7 +28,7 @@ public class EmployeeService {
     private final TaskRepository taskRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @Transactional
+    @Transactional(readOnly = true)
     public EmployeeResponse createEmployee(EmployeeRequest request) {
         if (employeeRepository.existsByEmployeeId(request.getEmployeeId())) {
             throw new DuplicateResourceException("Employee ID already exists: " + request.getEmployeeId());
@@ -69,28 +69,28 @@ public class EmployeeService {
 
         return toResponse(employee);
     }
-
+    @Transactional(readOnly = true)
     public List<EmployeeResponse> getAllEmployees(String search, String department, String status) {
         EmployeeStatus statusEnum = (status == null || status.isBlank()) ? null : EmployeeStatus.valueOf(status.toUpperCase());
         String s = (search == null || search.isBlank()) ? null : search;
         String d = (department == null || department.isBlank()) ? null : department;
         return employeeRepository.search(s, d, statusEnum).stream().map(this::toResponse).toList();
     }
-
+    @Transactional(readOnly = true)
     public EmployeeResponse getEmployeeById(Long id) {
         return toResponse(getEmployeeEntity(id));
     }
-
+    @Transactional(readOnly = true)
     public Employee getEmployeeEntity(Long id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee not found with id: " + id));
     }
-
+    @Transactional(readOnly = true)
     public Employee getEmployeeByUserId(Long userId) {
         return employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("No employee profile linked to this account"));
     }
-
+    @Transactional(readOnly = true)
     public EmployeeDetailResponse getEmployeeDetail(Long id) {
         Employee employee = getEmployeeEntity(id);
 
@@ -117,7 +117,7 @@ public class EmployeeService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public EmployeeResponse updateEmployee(Long id, EmployeeRequest request) {
         Employee employee = getEmployeeEntity(id);
 
@@ -156,7 +156,7 @@ public class EmployeeService {
         return toResponse(employee);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public void deactivateEmployee(Long id) {
         Employee employee = getEmployeeEntity(id);
         employee.setStatus(EmployeeStatus.INACTIVE);

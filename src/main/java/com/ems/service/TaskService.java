@@ -62,23 +62,23 @@ public class TaskService {
 
         return toResponse(task);
     }
-
+    @Transactional(readOnly = true)
     public List<TaskResponse> getAllTasks(String status, String priority, Long employeeId, String search) {
         TaskStatus statusEnum = (status == null || status.isBlank()) ? null : TaskStatus.valueOf(status.toUpperCase());
         Priority priorityEnum = (priority == null || priority.isBlank()) ? null : Priority.valueOf(priority.toUpperCase());
         String s = (search == null || search.isBlank()) ? null : search;
         return taskRepository.search(statusEnum, priorityEnum, employeeId, s).stream().map(this::toResponse).toList();
     }
-
+    @Transactional(readOnly = true)
     public TaskResponse getTaskById(Long id) {
         return toResponse(getTaskEntity(id));
     }
-
+    @Transactional(readOnly = true)
     public Task getTaskEntity(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
     }
-
+    @Transactional(readOnly = true)
     public List<TaskResponse> getMyTasks(Long employeeId) {
         return taskRepository.findMyTasksWithDetails(employeeId)
                 .stream()
@@ -86,7 +86,7 @@ public class TaskService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public TaskResponse updateTaskAdmin(Long id, TaskAdminUpdateRequest request) {
         Task task = getTaskEntity(id);
 
