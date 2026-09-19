@@ -96,18 +96,21 @@ public class AttendanceService {
         return toResponse(attendance);
     }
 
+    @Transactional(readOnly = true)
     public AttendanceResponse getTodayAttendance(Employee employee) {
         return attendanceRepository.findByEmployeeIdAndAttendanceDate(employee.getId(), LocalDate.now())
                 .map(this::toResponse)
                 .orElse(null);
     }
 
+    @Transactional(readOnly = true)
     public List<AttendanceResponse> getHistory(Long employeeId) {
         return attendanceRepository.findByEmployeeIdOrderByAttendanceDateDesc(employeeId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<AttendanceResponse> search(Long employeeId, LocalDate date, String department, String status) {
         AttendanceStatus statusEnum = (status == null || status.isBlank()) ? null : AttendanceStatus.valueOf(status.toUpperCase());
         String dept = (department == null || department.isBlank()) ? null : department;

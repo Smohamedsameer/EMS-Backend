@@ -73,7 +73,7 @@ public class TaskService {
     public TaskResponse getTaskById(Long id) {
         return toResponse(getTaskEntity(id));
     }
-    @Transactional(readOnly = true)
+    
     public Task getTaskEntity(Long id) {
         return taskRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + id));
@@ -86,7 +86,7 @@ public class TaskService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+   
     public TaskResponse updateTaskAdmin(Long id, TaskAdminUpdateRequest request) {
         Task task = getTaskEntity(id);
 
@@ -183,7 +183,7 @@ public class TaskService {
 
         return toUpdateResponse(update);
     }
-
+    @Transactional(readOnly = true)
     public List<TaskUpdateResponse> getTaskHistory(Long taskId) {
         return taskUpdateRepository.findByTaskIdOrderByCreatedAtDesc(taskId).stream().map(this::toUpdateResponse).toList();
     }
