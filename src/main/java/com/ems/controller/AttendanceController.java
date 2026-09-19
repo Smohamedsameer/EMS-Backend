@@ -2,6 +2,7 @@ package com.ems.controller;
 
 import com.ems.dto.AttendanceCorrectionRequest;
 import com.ems.dto.AttendanceResponse;
+import com.ems.dto.MonthlyAttendanceResponse;
 import com.ems.entity.Employee;
 import com.ems.security.CurrentUser;
 import com.ems.service.AttendanceService;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 
 @RestController
@@ -54,6 +56,15 @@ public class AttendanceController {
             @RequestParam(required = false) String department,
             @RequestParam(required = false) String status) {
         return ResponseEntity.ok(attendanceService.search(employeeId, date, department, status));
+    }
+
+    /** Month-wise attendance grid for all employees, e.g. GET /api/attendance/monthly?month=2026-09 */
+    @GetMapping("/monthly")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MonthlyAttendanceResponse> monthly(
+            @RequestParam(required = false) String month) {
+        YearMonth ym = (month == null || month.isBlank()) ? YearMonth.now() : YearMonth.parse(month);
+        return ResponseEntity.ok(attendanceService.getMonthlyGrid(ym));
     }
 
     @GetMapping("/employee/{employeeId}")

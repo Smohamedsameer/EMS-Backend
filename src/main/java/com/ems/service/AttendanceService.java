@@ -2,23 +2,32 @@ package com.ems.service;
 
 import com.ems.dto.AttendanceCorrectionRequest;
 import com.ems.dto.AttendanceResponse;
+import com.ems.dto.MonthlyAttendanceResponse;
 import com.ems.entity.Attendance;
 import com.ems.entity.AttendanceStatus;
 import com.ems.entity.Employee;
+import com.ems.entity.Holiday;
 import com.ems.exception.BadRequestException;
 import com.ems.exception.ResourceNotFoundException;
 import com.ems.repository.AttendanceRepository;
+import com.ems.repository.EmployeeRepository;
+import com.ems.repository.HolidayRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,6 +39,8 @@ public class AttendanceService {
     private static final double HALF_DAY_HOUR_LIMIT = 4.0;
 
     private final AttendanceRepository attendanceRepository;
+    private final EmployeeRepository employeeRepository;
+    private final HolidayRepository holidayRepository;
 
     @Transactional
     public AttendanceResponse checkIn(Employee employee) {
@@ -85,43 +96,22 @@ public class AttendanceService {
         return toResponse(attendance);
     }
 
-    @Transactional(readOnly = true)
     public AttendanceResponse getTodayAttendance(Employee employee) {
-        return attendanceRepository
-                .findByEmployeeIdAndAttendanceDate(employee.getId(), LocalDate.now())
+        return attendanceRepository.findByEmployeeIdAndAttendanceDate(employee.getId(), LocalDate.now())
                 .map(this::toResponse)
                 .orElse(null);
     }
 
-    @Transactional(readOnly = true)
     public List<AttendanceResponse> getHistory(Long employeeId) {
-        return attendanceRepository
-                .findByEmployeeIdOrderByAttendanceDateDesc(employeeId)
-                .stream()
+        return attendanceRepository.findByEmployeeIdOrderByAttendanceDateDesc(employeeId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<AttendanceResponse> search(
-            Long employeeId,
-            LocalDate date,
-            String department,
-            String status) {
-
-        AttendanceStatus statusEnum =
-                (status == null || status.isBlank())
-                        ? null
-                        : AttendanceStatus.valueOf(status.toUpperCase());
-
-        String dept =
-                (department == null || department.isBlank())
-                        ? null
-                        : department;
-
-        return attendanceRepository
-                .search(employeeId, date, dept, statusEnum)
-                .stream()
+    public List<AttendanceResponse> search(Long employeeId, LocalDate date, String department, String status) {
+        AttendanceStatus statusEnum = (status == null || status.isBlank()) ? null : AttendanceStatus.valueOf(status.toUpperCase());
+        String dept = (department == null || department.isBlank()) ? null : department;
+        return attendanceRepository.search(employeeId, date, dept, statusEnum).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -176,6 +166,127 @@ public class AttendanceService {
 
     public long countByDateAndStatus(LocalDate date, AttendanceStatus status) {
         return attendanceRepository.countByAttendanceDateAndStatus(date, status);
+    }
+
+    /**
+     * Builds the admin's month-wise attendance grid: one row per employee, one column per day
+     * of the given month, with a status code per cell and running totals.
+     *
+     * Rules:
+     *  - A date with a declared company Holiday -> "H" for every employee, regardless of anything else.
+     *  - A future date (after today) that isn't a holiday -> "-" (hasn't happened yet).
+     *  - A date before the employee's joining date -> "-" (not employed yet).
+     *  - Otherwise: an attendance record with status PRESENT/LATE -> "P", HALF_DAY -> "HD",
+     *    LEAVE (approved personal leave) -> "L", ABSENT -> "A".
+     *  - No attendance record at all for a past working date -> "A" (never checked in = absent).
+     *
+     * "Total working days" counts only cells that are P/HD/A/L for that employee (i.e. holidays and
+     * not-yet-applicable days are excluded).
+     */
+    public MonthlyAttendanceResponse getMonthlyGrid(YearMonth month) {
+        LocalDate today = LocalDate.now();
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+        int daysInMonth = end.getDayOfMonth();
+
+        Map<LocalDate, String> holidayMap = new HashMap<>();
+        for (Holiday h : holidayRepository.findByHolidayDateBetweenOrderByHolidayDateAsc(start, end)) {
+            holidayMap.put(h.getHolidayDate(), h.getReason());
+        }
+
+        Map<Long, Map<LocalDate, Attendance>> byEmployeeDate = new HashMap<>();
+        for (Attendance a : attendanceRepository.findByAttendanceDateBetween(start, end)) {
+            byEmployeeDate
+                    .computeIfAbsent(a.getEmployee().getId(), k -> new HashMap<>())
+                    .put(a.getAttendanceDate(), a);
+        }
+
+        List<MonthlyAttendanceResponse.DayMeta> days = new ArrayList<>();
+        for (int d = 1; d <= daysInMonth; d++) {
+            LocalDate date = month.atDay(d);
+            days.add(MonthlyAttendanceResponse.DayMeta.builder()
+                    .day(d)
+                    .date(date)
+                    .weekday(date.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH).toUpperCase())
+                    .sunday(date.getDayOfWeek() == DayOfWeek.SUNDAY)
+                    .holiday(holidayMap.containsKey(date))
+                    .holidayReason(holidayMap.get(date))
+                    .future(date.isAfter(today))
+                    .build());
+        }
+
+        List<Employee> employees = employeeRepository.findAll(
+                org.springframework.data.domain.Sort.by("name"));
+
+        List<MonthlyAttendanceResponse.EmployeeMonthRow> rows = new ArrayList<>();
+        for (Employee employee : employees) {
+            Map<LocalDate, Attendance> records = byEmployeeDate.getOrDefault(employee.getId(), Map.of());
+            List<String> codes = new ArrayList<>(daysInMonth);
+
+            int workingDays = 0, present = 0, absent = 0, leave = 0, holidays = 0, halfDays = 0;
+
+            for (int d = 1; d <= daysInMonth; d++) {
+                LocalDate date = month.atDay(d);
+                String code;
+
+                if (holidayMap.containsKey(date)) {
+                    code = "H";
+                    holidays++;
+                } else if (date.isAfter(today)) {
+                    code = "-";
+                } else if (employee.getJoiningDate() != null && date.isBefore(employee.getJoiningDate())) {
+                    code = "-";
+                } else {
+                    Attendance a = records.get(date);
+                    if (a == null) {
+                        code = "A";
+                        absent++;
+                    } else {
+                        switch (a.getStatus()) {
+                            case PRESENT, LATE -> {
+                                code = "P";
+                                present++;
+                            }
+                            case HALF_DAY -> {
+                                code = "HD";
+                                halfDays++;
+                            }
+                            case LEAVE -> {
+                                code = "L";
+                                leave++;
+                            }
+                            default -> {
+                                code = "A";
+                                absent++;
+                            }
+                        }
+                    }
+                    workingDays++;
+                }
+
+                codes.add(code);
+            }
+
+            rows.add(MonthlyAttendanceResponse.EmployeeMonthRow.builder()
+                    .employeeDbId(employee.getId())
+                    .employeeId(employee.getEmployeeId())
+                    .employeeName(employee.getName())
+                    .department(employee.getDepartment())
+                    .dayCodes(codes)
+                    .totalWorkingDays(workingDays)
+                    .totalPresent(present)
+                    .totalAbsent(absent)
+                    .totalLeave(leave)
+                    .totalHolidays(holidays)
+                    .totalHalfDays(halfDays)
+                    .build());
+        }
+
+        return MonthlyAttendanceResponse.builder()
+                .month(month.toString())
+                .days(days)
+                .employees(rows)
+                .build();
     }
 
     private AttendanceResponse toResponse(Attendance a) {

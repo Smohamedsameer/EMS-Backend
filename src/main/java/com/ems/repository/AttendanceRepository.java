@@ -18,6 +18,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     List<Attendance> findByAttendanceDate(LocalDate date);
 
+    List<Attendance> findByAttendanceDateBetween(LocalDate start, LocalDate end);
+
     long countByAttendanceDateAndStatus(LocalDate date, AttendanceStatus status);
 
     @Query("SELECT a FROM Attendance a WHERE " +
